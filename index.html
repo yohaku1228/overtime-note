@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#102d35">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<title>残業ノート</title>
+<style>
+*{box-sizing:border-box}
+:root{font-family:system-ui,sans-serif;color:#142e36;background:#eff4f3;font-size:16px}
+body{margin:0}
+main{max-width:640px;margin:auto;padding:24px 16px 40px}
+header{margin:0 0 20px}
+h1{font-size:30px;margin:3px 0}
+h2,summary{font-size:18px;font-weight:750;margin:0 0 12px}
+p{margin:7px 0;line-height:1.65}
+.muted{color:#475e63;font-size:14px}
+.tag{font-size:12px;letter-spacing:.12em;font-weight:750;color:#086453}
+section,details{background:white;border:1px solid #d8e4e2;border-radius:18px;padding:16px;margin:12px 0}
+.hero{background:#102d35;color:white;border:0}
+.hero .muted{color:#c2d9d7}
+.hero h2{color:#c2d9d7;font-size:14px;margin-bottom:4px}
+.total{font-size:clamp(32px,9vw,46px);font-weight:800;font-variant-numeric:tabular-nums}
+.stats,.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.stats{border-top:1px solid #456268;margin-top:12px;padding-top:12px}
+.stats strong{display:block;font-size:18px;margin-top:4px}
+.month{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.month strong{font-size:19px}
+label{display:block;min-width:0;font-size:14px;font-weight:650;margin-bottom:10px}
+input,button{font:inherit;min-height:44px;border-radius:10px}
+input{display:block;width:100%;min-width:0;border:1px solid #9eafaf;background:#fff;color:#142e36;padding:7px 10px;margin-top:4px;font-size:16px}
+input[type=date]{appearance:none}
+button{cursor:pointer;border:1px solid #b6c9c7;background:#f5faf9;color:#142e36;padding:7px 12px}
+button.primary{width:100%;background:#076453;border-color:#076453;color:white;font-weight:750}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:3px solid #008a72;outline-offset:2px}
+summary{cursor:pointer;margin:0;min-height:44px;padding:9px 0}
+ul{list-style:none;padding:0;margin:0}
+li{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid #d8e4e2;padding:6px 0;font-size:14px}
+li button{padding:4px 8px}
+.error{color:#9a271b;font-size:14px}
+.rpa-actions{display:flex;gap:8px;margin-top:10px}
+.rpa-actions .primary{flex:1;width:auto}
+#notice,#rpaNotice{min-height:1.5em}
+</style>
+<main>
+ <header><div class="tag">このブラウザーに保存</div><h1>残業ノート</h1><p class="muted">日ごとの普通残業を記録して、月の振込額を見積もる。</p></header>
+ <p id="storageError" class="error" role="alert" hidden>ブラウザーに保存できません。このまま閉じると入力が失われる場合があります。</p>
+ <nav class="month" aria-label="表示する月"><button id="prev" type="button">‹ 前月</button><strong id="month"></strong><button id="next" type="button">翌月 ›</button></nav>
+ <section class="hero" aria-label="月間集計" aria-live="polite">
+  <h2>手取り目安</h2><div class="total" id="net">—</div>
+  <div class="stats"><div><span class="muted">合計残業時間</span><strong id="duration">0時間00分</strong></div><div><span class="muted">概算残業代（額面）</span><strong id="pay">—</strong></div><div><span class="muted">RPA手当（額面）</span><strong id="rpaPay">0円</strong></div></div>
+ </section>
+ <section aria-labelledby="rpaTitle">
+  <h2 id="rpaTitle">休日出勤（RPA）</h2>
+  <p class="muted">1回5,000円。勤務時間にかかわらず、表示中の月に記録します。</p>
+  <p><strong id="rpaCount">0回</strong></p>
+  <div class="rpa-actions"><button id="rpaAdd" class="primary" type="button">＋ RPAを1回追加</button><button id="rpaUndo" type="button">1回減らす</button></div>
+  <p id="rpaNotice" class="muted" role="status"></p>
+ </section>
+ <details id="settings">
+  <summary>給与の基準設定</summary>
+  <p class="muted">同じ月の普通残業時間、普通残業手当、実際の振込額、RPA回数を入力してください。</p>
+  <form id="calibration" autocomplete="off">
+   <div class="pair">
+    <label>実績の時間<input id="baseH" type="number" inputmode="numeric" min="0" max="744" step="1" required></label>
+    <label>実績の分<input id="baseM" type="number" inputmode="numeric" min="0" max="59" step="1" required></label>
+    <label>残業手当（円）<input id="basePay" type="number" inputmode="numeric" min="1" max="99999999" step="1" required></label>
+    <label>振込額（円）<input id="baseNet" type="number" inputmode="numeric" min="0" max="99999999" step="1" required></label>
+    <label>実績のRPA回数<input id="baseRpa" type="number" inputmode="numeric" min="0" max="999" step="1" required></label>
+   </div>
+   <p class="muted">割増倍率は1.25倍。振込額は「実績の振込額＋普通残業手当の差額＋RPA手当の差額」で試算します。税や保険料などの変動は反映しません。設定の変更は全月の試算に適用されます。</p>
+   <button class="primary" type="submit">基準を保存</button>
+   <p id="basis" class="muted"></p><p id="calNotice" role="status" class="muted"></p>
+  </form>
+ </details>
+ <section>
+  <h2>残業を入力</h2>
+  <form id="entry" autocomplete="off">
+   <label>日付<input id="day" type="date" required></label>
+   <div class="pair"><label>時間<input id="hours" type="number" inputmode="numeric" min="0" max="24" step="1" placeholder="0"></label><label>分<input id="minutes" type="number" inputmode="numeric" min="0" max="59" step="1" placeholder="00"></label></div>
+   <button class="primary" type="submit">この日の残業を保存</button>
+   <p class="muted">同じ日付を保存すると、その日の記録を更新します。</p>
+   <p id="notice" class="muted" role="status"></p>
+  </form>
+ </section>
+ <section><h2>この月の記録</h2><p id="empty" class="muted">まだ記録はありません。</p><ul id="list"></ul></section>
+ <p class="muted">入力内容はこのブラウザー内に保存し、外部に送信しません。SafariのWebサイトデータを消去すると記録も消えます。通常のタブで、毎回同じURLを開いてください。</p>
+</main>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const key = 'overtime-note-v1:' + location.pathname.replace(/index\.html$/, '');
+const fmt = new Intl.NumberFormat('ja-JP', {maximumFractionDigits:2, minimumFractionDigits:2});
+const yen = n => n.toLocaleString('ja-JP') + '円';
+const RPA_PAY = 5000;
+const duration = n => Math.floor(n/60) + '時間' + String(n%60).padStart(2,'0') + '分';
+const pad = n => String(n).padStart(2,'0');
+const now = new Date();
+const today = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate());
+let month = today.slice(0,7);
+let data = {base:null, days:{}};
+try {
+ const saved = localStorage.getItem(key);
+ if(saved) data = JSON.parse(saved);
+} catch { $('storageError').hidden = false; }
+data.rpa ??= {};
+function save(){
+ try { localStorage.setItem(key, JSON.stringify(data)); $('storageError').hidden = true; return true; }
+ catch { $('storageError').hidden = false; return false; }
+}
+function estimate(n,b,count=0){
+ const pay = Math.round(n*b.pay/b.minutes);
+ const baseline = b.net-b.pay-b.rpa*RPA_PAY;
+ return {pay, baseline, net:baseline+pay+count*RPA_PAY, hourly:b.pay*60/b.minutes};
+}
+function selectDay(d){
+ $('day').value = d;
+ const value = data.days[d];
+ $('hours').value = value === undefined ? '' : Math.floor(value/60);
+ $('minutes').value = value === undefined ? '' : value%60;
+}
+function render(){
+ const [y,m] = month.split('-');
+ $('month').textContent = Number(y) + '年' + Number(m) + '月';
+ const rows = Object.entries(data.days).filter(([d])=>d.slice(0,7)===month).sort(([a],[b])=>b.localeCompare(a));
+ const total = rows.reduce((sum,[,n])=>sum+n,0);
+ $('duration').textContent = duration(total);
+ const count=data.rpa[month] ?? 0;
+ $('rpaCount').textContent=count+'回';
+ $('rpaPay').textContent=yen(count*RPA_PAY);
+ $('rpaUndo').disabled=count===0;
+ if(data.base && Number.isInteger(data.base.rpa)){
+  const e = estimate(total,data.base,count);
+  $('pay').textContent = yen(e.pay);
+  $('net').textContent = yen(e.net);
+  $('basis').textContent = '基本時給：約 ' + fmt.format(e.hourly/1.25) + '円 ／ 残業単価：約 ' + fmt.format(e.hourly) + '円 ／ 残業・RPAなしの手取り目安：' + yen(e.baseline);
+ } else {
+  $('pay').textContent = $('net').textContent = '—';
+  $('basis').textContent = '';
+ }
+ $('empty').hidden = rows.length>0;
+ $('list').replaceChildren(...rows.map(([d,n])=>{
+  const row=document.createElement('li'), label=document.createElement('span'), edit=document.createElement('button'), remove=document.createElement('button'), actions=document.createElement('span');
+  label.textContent=Number(d.slice(5,7))+'月'+Number(d.slice(8))+'日　'+duration(n);
+  edit.textContent='編集'; remove.textContent='削除';
+  edit.setAttribute('aria-label',label.textContent+'を編集'); remove.setAttribute('aria-label',label.textContent+'を削除');
+  edit.onclick=()=>{selectDay(d); $('hours').focus(); $('notice').textContent='';};
+  remove.onclick=()=>{
+   if(!confirm(label.textContent+'の記録を削除しますか？')) return;
+   delete data.days[d]; const ok=save();
+   if($('day').value===d) selectDay(d);
+   render(); $('notice').textContent=ok?'削除しました。':'削除を保存できませんでした。'; $('day').focus();
+  };
+  actions.append(edit,' ',remove); row.append(label,actions); return row;
+ }));
+}
+function shift(delta){
+ const [y,m]=month.split('-').map(Number);
+ const d=new Date(y,m-1+delta,1);
+ month=d.getFullYear()+'-'+pad(d.getMonth()+1);
+ selectDay(today.startsWith(month)?today:month+'-01');
+ $('notice').textContent=$('rpaNotice').textContent=''; render();
+}
+function changeRpa(delta){
+ const count=Math.max(0,(data.rpa[month] ?? 0)+delta);
+ if(count) data.rpa[month]=count;
+ else delete data.rpa[month];
+ const ok=save(); render();
+ $('rpaNotice').textContent=ok?'表示中の月のRPAを'+count+'回に更新しました。':'このブラウザーに保存できませんでした。';
+}
+$('rpaAdd').onclick=()=>changeRpa(1);
+$('rpaUndo').onclick=()=>changeRpa(-1);
+$('prev').onclick=()=>shift(-1);
+$('next').onclick=()=>shift(1);
+$('day').onchange=()=>{
+ const d=$('day').value;
+ if(d && $('day').validity.valid){month=d.slice(0,7);selectDay(d);$('notice').textContent=$('rpaNotice').textContent='';render();}
+};
+$('entry').onsubmit=e=>{
+ e.preventDefault();
+ const d=$('day').value, h=$('hours').value, m=$('minutes').value, n=Number(h)*60+Number(m);
+ if(!h && !m){$('notice').textContent='時間か分を入力してください。';return;}
+ if(n>1440){$('notice').textContent='1日分は24時間以内で入力してください。';return;}
+ data.days[d]=n;
+ month=d.slice(0,7); const ok=save(); selectDay(d); render();
+ $('notice').textContent=ok?'保存しました。':'このブラウザーに保存できませんでした。';
+};
+$('calibration').onsubmit=e=>{
+ e.preventDefault();
+ const minutes=Number($('baseH').value)*60+Number($('baseM').value);
+ if(!minutes){$('calNotice').textContent='実績の残業時間は1分以上を入力してください。';return;}
+ data.base={minutes,pay:Number($('basePay').value),net:Number($('baseNet').value),rpa:Number($('baseRpa').value)};
+ $('calNotice').textContent=save()?'基準を保存しました。':'このブラウザーに保存できませんでした。';
+ render();
+};
+if(data.base){
+ $('baseH').value=Math.floor(data.base.minutes/60); $('baseM').value=data.base.minutes%60;
+ $('basePay').value=data.base.pay; $('baseNet').value=data.base.net;
+ if(Number.isInteger(data.base.rpa)) $('baseRpa').value=data.base.rpa;
+ else {
+  $('settings').open=true;
+  $('calNotice').textContent='振込額の試算を更新するため、実績のRPA回数を入力して基準を保存してください。';
+ }
+} else $('settings').open=true;
+selectDay(today); render();
+</script>
