@@ -2,41 +2,45 @@
 <html lang="ja">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#102d35">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<meta name="theme-color" content="#8d1629">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="残業ノート">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+<link rel="icon" type="image/png" href="./apple-touch-icon.png">
 <title>残業ノート</title>
 <style>
 *{box-sizing:border-box}
-:root{font-family:system-ui,sans-serif;color:#142e36;background:#eff4f3;font-size:16px}
+:root{font-family:system-ui,sans-serif;color:#371822;background:#fcf0ef;font-size:16px}
 body{margin:0}
 main{max-width:640px;margin:auto;padding:24px 16px 40px}
 header{margin:0 0 20px}
 h1{font-size:30px;margin:3px 0}
 h2,summary{font-size:18px;font-weight:750;margin:0 0 12px}
 p{margin:7px 0;line-height:1.65}
-.muted{color:#475e63;font-size:14px}
-.tag{font-size:12px;letter-spacing:.12em;font-weight:750;color:#086453}
-section,details{background:white;border:1px solid #d8e4e2;border-radius:18px;padding:16px;margin:12px 0}
-.hero{background:#102d35;color:white;border:0}
-.hero .muted{color:#c2d9d7}
-.hero h2{color:#c2d9d7;font-size:14px;margin-bottom:4px}
+.muted{color:#694851;font-size:14px}
+.tag{font-size:12px;letter-spacing:.12em;font-weight:750;color:#a22035}
+section,details{background:white;border:1px solid #eed4d5;border-radius:18px;padding:16px;margin:12px 0}
+.hero{background:linear-gradient(145deg,#761225,#a71e35);color:white;border:0}
+.hero .muted{color:#ffe1e5}
+.hero h2{color:#ffe1e5;font-size:14px;margin-bottom:4px}
 .total{font-size:clamp(32px,9vw,46px);font-weight:800;font-variant-numeric:tabular-nums}
 .stats,.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.stats{border-top:1px solid #456268;margin-top:12px;padding-top:12px}
+.stats{border-top:1px solid #ce7886;margin-top:12px;padding-top:12px}
 .stats strong{display:block;font-size:18px;margin-top:4px}
 .month{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .month strong{font-size:19px}
 label{display:block;min-width:0;font-size:14px;font-weight:650;margin-bottom:10px}
 input,button{font:inherit;min-height:44px;border-radius:10px}
-input{display:block;width:100%;min-width:0;border:1px solid #9eafaf;background:#fff;color:#142e36;padding:7px 10px;margin-top:4px;font-size:16px}
+input{display:block;width:100%;min-width:0;border:1px solid #b18b91;background:#fff;color:#371822;padding:7px 10px;margin-top:4px;font-size:16px}
 input[type=date]{appearance:none}
-button{cursor:pointer;border:1px solid #b6c9c7;background:#f5faf9;color:#142e36;padding:7px 12px}
-button.primary{width:100%;background:#076453;border-color:#076453;color:white;font-weight:750}
+button{cursor:pointer;border:1px solid #e4bdc3;background:#fff5f5;color:#78182a;padding:7px 12px}
+button.primary{width:100%;background:#b3223b;border-color:#b3223b;color:white;font-weight:750}
 button:disabled{opacity:.45;cursor:default}
-:focus-visible{outline:3px solid #008a72;outline-offset:2px}
+:focus-visible{outline:3px solid #b3223b;outline-offset:2px}
 summary{cursor:pointer;margin:0;min-height:44px;padding:9px 0}
 ul{list-style:none;padding:0;margin:0}
-li{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid #d8e4e2;padding:6px 0;font-size:14px}
+li{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid #eed4d5;padding:6px 0;font-size:14px}
 li button{padding:4px 8px}
 .error{color:#9a271b;font-size:14px}
 .rpa-actions{display:flex;gap:8px;margin-top:10px}
