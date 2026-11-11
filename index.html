@@ -50,18 +50,21 @@ li button{padding:4px 8px}
 <main>
  <header><div class="tag">このブラウザーに保存</div><h1>残業ノート</h1><p class="muted">日ごとの普通残業を記録して、月の振込額を見積もる。</p></header>
  <p id="storageError" class="error" role="alert" hidden>ブラウザーに保存できません。このまま閉じると入力が失われる場合があります。</p>
- <nav class="month" aria-label="表示する月"><button id="prev" type="button">‹ 前月</button><strong id="month"></strong><button id="next" type="button">翌月 ›</button></nav>
+ <nav class="month" aria-label="給与の支払月"><button id="prev" type="button">‹ 前月</button><strong id="month"></strong><button id="next" type="button">翌月 ›</button></nav>
+ <p id="periodRange" class="muted"></p>
+ <p id="payDate" class="muted"></p>
  <section class="hero" aria-label="月間集計" aria-live="polite">
   <h2>手取り目安</h2><div class="total" id="net">—</div>
   <div class="stats"><div><span class="muted">合計残業時間</span><strong id="duration">0時間00分</strong></div><div><span class="muted">概算残業代（額面）</span><strong id="pay">—</strong></div><div><span class="muted">RPA手当（額面）</span><strong id="rpaPay">0円</strong></div></div>
  </section>
  <section aria-labelledby="rpaTitle">
   <h2 id="rpaTitle">休日出勤（RPA）</h2>
-  <p class="muted">1回5,000円。勤務時間にかかわらず、表示中の月に記録します。</p>
+  <p class="muted">1回5,000円。表示中の集計期間に記録します。</p>
   <p><strong id="rpaCount">0回</strong></p>
   <div class="rpa-actions"><button id="rpaAdd" class="primary" type="button">＋ RPAを1回追加</button><button id="rpaUndo" type="button">1回減らす</button></div>
   <p id="rpaNotice" class="muted" role="status"></p>
  </section>
+ <section id="legacyRpa" hidden><h2>以前のRPA記録の引き継ぎ</h2><p class="muted">以前は暦月ごとの回数で保存していました。各記録の支払月を選んでください。16日以降の出勤は翌月払いです。複数の支払月に分かれる場合は、振り分けたあと各期間のボタンで回数を調整してください。</p><div id="legacyRows"></div><p id="legacyNotice" class="muted" role="status"></p></section>
  <details id="settings">
   <summary>給与の基準設定</summary>
   <p class="muted">同じ月の普通残業時間、普通残業手当、実際の振込額、RPA回数を入力してください。</p>
@@ -88,7 +91,7 @@ li button{padding:4px 8px}
    <p id="notice" class="muted" role="status"></p>
   </form>
  </section>
- <section><h2>この月の記録</h2><p id="empty" class="muted">まだ記録はありません。</p><ul id="list"></ul></section>
+ <section><h2>この集計期間の記録</h2><p id="empty" class="muted">まだ記録はありません。</p><ul id="list"></ul></section>
  <p class="muted">入力内容はこのブラウザー内に保存し、外部に送信しません。SafariのWebサイトデータを消去すると記録も消えます。通常のタブで、毎回同じURLを開いてください。</p>
 </main>
 <script>
@@ -102,13 +105,27 @@ const duration = n => Math.floor(n/60) + '時間' + String(n%60).padStart(2,'0')
 const pad = n => String(n).padStart(2,'0');
 const now = new Date();
 const today = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate());
-let month = today.slice(0,7);
+function shiftMonth(value, delta){
+ const [year, number] = value.split('-').map(Number);
+ const date = new Date(year, number-1+delta, 1);
+ return date.getFullYear()+'-'+pad(date.getMonth()+1);
+}
+function periodForDate(date){
+ const calendarMonth = date.slice(0,7);
+ return Number(date.slice(8,10)) >= 16 ? shiftMonth(calendarMonth,1) : calendarMonth;
+}
+function displayDate(date){
+ const [year,number,day] = date.split('-').map(Number);
+ return year+'年'+number+'月'+day+'日';
+}
+let month = periodForDate(today);
 let data = {base:null, days:{}};
 try {
  const saved = localStorage.getItem(key);
  if(saved) data = JSON.parse(saved);
 } catch { $('storageError').hidden = false; }
 data.rpa ??= {};
+data.rpaPeriods ??= {};
 function save(){
  try { localStorage.setItem(key, JSON.stringify(data)); $('storageError').hidden = true; return true; }
  catch { $('storageError').hidden = false; return false; }
@@ -126,11 +143,13 @@ function selectDay(d){
 }
 function render(){
  const [y,m] = month.split('-');
- $('month').textContent = Number(y) + '年' + Number(m) + '月';
- const rows = Object.entries(data.days).filter(([d])=>d.slice(0,7)===month).sort(([a],[b])=>b.localeCompare(a));
+ $('month').textContent = Number(y) + '年' + Number(m) + '月支払';
+ $('periodRange').textContent = '集計期間　'+displayDate(shiftMonth(month,-1)+'-16')+'〜'+displayDate(month+'-15');
+ $('payDate').textContent = '支払予定日　'+displayDate(month+'-25');
+ const rows = Object.entries(data.days).filter(([d])=>periodForDate(d)===month).sort(([a],[b])=>b.localeCompare(a));
  const total = rows.reduce((sum,[,n])=>sum+n,0);
  $('duration').textContent = duration(total);
- const count=data.rpa[month] ?? 0;
+ const count=data.rpaPeriods[month] ?? 0;
  $('rpaCount').textContent=count+'回';
  $('rpaPay').textContent=yen(count*RPA_PAY);
  $('rpaUndo').disabled=count===0;
@@ -160,18 +179,46 @@ function render(){
  }));
 }
 function shift(delta){
- const [y,m]=month.split('-').map(Number);
- const d=new Date(y,m-1+delta,1);
- month=d.getFullYear()+'-'+pad(d.getMonth()+1);
- selectDay(today.startsWith(month)?today:month+'-01');
+ month=shiftMonth(month,delta);
+ selectDay(periodForDate(today)===month?today:shiftMonth(month,-1)+'-16');
  $('notice').textContent=$('rpaNotice').textContent=''; render();
 }
 function changeRpa(delta){
- const count=Math.max(0,(data.rpa[month] ?? 0)+delta);
- if(count) data.rpa[month]=count;
- else delete data.rpa[month];
+ const count=Math.max(0,(data.rpaPeriods[month] ?? 0)+delta);
+ if(count) data.rpaPeriods[month]=count;
+ else delete data.rpaPeriods[month];
  const ok=save(); render();
- $('rpaNotice').textContent=ok?'表示中の月のRPAを'+count+'回に更新しました。':'このブラウザーに保存できませんでした。';
+ $('rpaNotice').textContent=ok?'表示中の集計期間のRPAを'+count+'回に更新しました。':'このブラウザーに保存できませんでした。';
+}
+function renderLegacyRpa(){
+ const records=Object.entries(data.rpa).filter(([,count])=>count>0);
+ $('legacyRpa').hidden=records.length===0;
+ $('legacyRows').replaceChildren(...records.map(([calendarMonth,count])=>{
+  const row=document.createElement('div');
+  const label=document.createElement('label');
+  const select=document.createElement('input');
+  const button=document.createElement('button');
+  select.type='month';
+  label.textContent=calendarMonth+'のRPA '+count+'回 → 支払月';
+  label.append(select);
+  button.textContent='この支払月に引き継ぐ';
+  button.onclick=()=>{
+   if(!/^\d{4}-\d{2}$/.test(select.value)){ $('legacyNotice').textContent='支払月を選んでください。'; return; }
+   const target=select.value;
+   data.rpaPeriods[target]=(data.rpaPeriods[target] ?? 0)+count;
+   delete data.rpa[calendarMonth];
+   if(!save()){
+    data.rpa[calendarMonth]=count;
+    data.rpaPeriods[target]-=count;
+    $('legacyNotice').textContent='保存できませんでした。もう一度お試しください。';
+    return;
+   }
+   month=target;
+   selectDay(shiftMonth(month,-1)+'-16');
+   renderLegacyRpa(); render();
+  };
+  row.append(label,button); return row;
+ }));
 }
 $('rpaAdd').onclick=()=>changeRpa(1);
 $('rpaUndo').onclick=()=>changeRpa(-1);
@@ -179,7 +226,7 @@ $('prev').onclick=()=>shift(-1);
 $('next').onclick=()=>shift(1);
 $('day').onchange=()=>{
  const d=$('day').value;
- if(d && $('day').validity.valid){month=d.slice(0,7);selectDay(d);$('notice').textContent=$('rpaNotice').textContent='';render();}
+ if(d && $('day').validity.valid){month=periodForDate(d);selectDay(d);$('notice').textContent=$('rpaNotice').textContent='';render();}
 };
 $('entry').onsubmit=e=>{
  e.preventDefault();
@@ -187,7 +234,7 @@ $('entry').onsubmit=e=>{
  if(!h && !m){$('notice').textContent='時間か分を入力してください。';return;}
  if(n>1440){$('notice').textContent='1日分は24時間以内で入力してください。';return;}
  data.days[d]=n;
- month=d.slice(0,7); const ok=save(); selectDay(d); render();
+ month=periodForDate(d); const ok=save(); selectDay(d); render();
  $('notice').textContent=ok?'保存しました。':'このブラウザーに保存できませんでした。';
 };
 $('calibration').onsubmit=e=>{
@@ -207,5 +254,5 @@ if(data.base){
   $('calNotice').textContent='振込額の試算を更新するため、実績のRPA回数を入力して基準を保存してください。';
  }
 } else $('settings').open=true;
-selectDay(today); render();
+selectDay(today); renderLegacyRpa(); render();
 </script>
